@@ -1,0 +1,156 @@
+use super::linear::LogisticRegression;
+use super::mlp::Mlp;
+use super::rbf::RbfNetwork;
+use super::traits::Classifier;
+use anyhow::{bail, Result};
+use nalgebra::DMatrix;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub enum AnyModel {
+    LinearRegression(LogisticRegression), // régression linéaire = même struct, loss différente (voir TODO linear.rs)
+    LogisticRegression(LogisticRegression),
+    Mlp(Mlp),
+    Rbf(RbfNetwork),
+    // Svm(SvmMulticlass), // TODO : à activer une fois svm.rs implémenté
+}
+
+/// Identifiant textuel utilisé côté frontend / commandes (correspond aux entrées du menu)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ModelKind {
+    LinearRegression,
+    LogisticRegression,
+    Mlp,
+    Svm,
+    Rbf,
+}
+
+impl ModelKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ModelKind::LinearRegression => "linear_regression",
+            ModelKind::LogisticRegression => "logistic_regression",
+            ModelKind::Mlp => "mlp",
+            ModelKind::Svm => "svm",
+            ModelKind::Rbf => "rbf",
+        }
+    }
+}
+
+impl AnyModel {
+    pub fn fit(&mut self, x: &DMatrix<f64>, y: &[usize], n_classes: usize) {
+        match self {
+            AnyModel::LinearRegression(m) => m.fit(x, y, n_classes),
+            AnyModel::LogisticRegression(m) => m.fit(x, y, n_classes),
+            AnyModel::Mlp(m) => m.fit(x, y, n_classes),
+            AnyModel::Rbf(m) => m.fit(x, y, n_classes),
+        }
+    }
+
+    pub fn predict_proba(&self, x: &DMatrix<f64>) -> DMatrix<f64> {
+        match self {
+            AnyModel::LinearRegression(m) => m.predict_proba(x),
+            AnyModel::LogisticRegression(m) => m.predict_proba(x),
+            AnyModel::Mlp(m) => m.predict_proba(x),
+            AnyModel::Rbf(m) => m.predict_proba(x),
+        }
+    }
+
+    pub fn predict(&self, x: &DMatrix<f64>) -> Vec<usize> {
+        match self {
+            AnyModel::LinearRegression(m) => m.predict(x),
+            AnyModel::LogisticRegression(m) => m.predict(x),
+            AnyModel::Mlp(m) => m.predict(x),
+            AnyModel::Rbf(m) => m.predict(x),
+        }
+    }
+
+    pub fn kind(&self) -> ModelKind {
+        match self {
+            AnyModel::LinearRegression(_) => ModelKind::LinearRegression,
+            AnyModel::LogisticRegression(_) => ModelKind::LogisticRegression,
+            AnyModel::Mlp(_) => ModelKind::Mlp,
+            AnyModel::Rbf(_) => ModelKind::Rbf,
+        }
+    }
+
+    /// Construit un modèle vierge du bon type avec des hyperparamètres par défaut/fournis.
+    pub fn new(kind: ModelKind, n_features: usize, n_classes: usize, params: &TrainParams) -> Result<Self> {
+        Ok(match kind {
+            ModelKind::LinearRegression | ModelKind::LogisticRegression => {
+                let model = LogisticRegression::new(n_features, n_classes, params.lr, params.epochs);
+                if kind == ModelKind::LinearRegression {
+                    AnyModel::LinearRegression(model)
+                } else {
+                    AnyModel::LogisticRegression(model)
+                }
+            }
+            ModelKind::Mlp => AnyModel::Mlp(Mlp::new(
+                n_features,
+                &params.hidden_layers,
+                n_classes,
+                params.lr,
+                params.epochs,
+                params.batch_size,
+            )),
+            ModelKind::Rbf => AnyModel::Rbf(RbfNetwork::new(
+                params.n_centers,
+                n_classes,
+                params.sigma,
+                params.lr,
+                params.epochs,
+            )),
+            ModelKind::Svm => bail!("SVM pas encore implémenté (voir TODO models/svm.rs)"),
+        })
+    }
+}
+
+/// Hyperparamètres génériques envoyés depuis le frontend (formulaire "Entraîner").
+/// Tous les champs ne sont pas utilisés par tous les modèles (ex: n_centers ignoré pour le MLP).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainParams {
+    pub lr: f64,
+    pub epochs: usize,
+    pub batch_size: usize,
+    pub hidden_layers: Vec<usize>,
+    pub n_centers: usize,
+    pub sigma: f64,
+}
+
+impl Default for TrainParams {
+    fn default() -> Self {
+        Self {
+            lr: 0.05,
+            epochs: 200,
+            batch_size: 32,
+            hidden_layers: vec![64, 32],
+            n_centers: 20,
+            sigma: 1.0,
+        }
+    }
+}
+
+// TODO IMPORTANT : `AnyModel::LinearRegression` réutilise encore
+// LogisticRegression (softmax) alors que `regression::LinearRegression` est
+// maintenant implémenté (sortie continue, MSE). Je ne l'ai PAS branché ici
+// volontairement : `regression::LinearRegression::fit()` attend `y: &[f64]`
+// (des valeurs continues), alors que le trait `Classifier` partagé par tout
+// AnyModel attend `y: &[usize]` (des labels de classe). Les deux ne sont pas
+// compatibles tels quels.
+//
+// Concrètement, ça pose une vraie question de conception, pas juste un TODO
+// mécanique : dans CETTE application (classification de genre de moto), le
+// dataset n'a que des labels catégoriels (le genre), donc il n'y a pas de
+// cible continue naturelle à prédire — "Régression Linéaire" n'a de sens
+// que sur les cas de test du notebook (X/Y synthétiques, déjà couverts par
+// tests/test_cases.rs, qui utilisent regression::LinearRegression directement,
+// SANS passer par AnyModel).
+//
+// Si tu veux quand même l'exposer dans le menu de l'app (entrée 2, "Entraîner"),
+// deux options : (a) un second trait `Regressor` séparé de `Classifier`, avec
+// son propre stockage dans AppState (ex: `regression_model: Option<LinearRegression>`
+// à côté de `models: HashMap<ModelKind, AnyModel>`) ; (b) accepter que cette
+// entrée de menu reste "cas de test uniquement, pas d'entraînement GUI" et le
+// documenter comme limitation connue dans le rapport. L'option (b) est plus
+// rapide et défendable pour un projet étudiant — à toi de voir selon le temps
+// qu'il te reste.

@@ -1,0 +1,117 @@
+:root {
+  --bg: #1e1e2e;
+  --panel: #27293d;
+  --accent: #7c5cff;
+  --text: #e4e4f0;
+  --muted: #9a9ab0;
+  --error: #ff6b6b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: 260px 1fr;
+  height: 100vh;
+}
+
+.banner {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 8px 0;
+  background: var(--panel);
+  border-bottom: 1px solid #3a3c55;
+}
+.banner pre {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.menu {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.menu-item {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.menu-item:hover { background: #33344d; }
+.menu-item.active { background: var(--accent); color: white; }
+
+.content {
+  padding: 24px;
+  overflow-y: auto;
+}
+.content h2 { margin-top: 0; }
+.placeholder { color: var(--muted); }
+
+.status {
+  grid-column: 1 / -1;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-top: 1px solid #3a3c55;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 18px;
+}
+.status.error { color: var(--error); }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab {
+  background: var(--panel);
+  border: 1px solid #3a3c55;
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+.form { display: flex; flex-direction: column; gap: 10px; max-width: 400px; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.form input, select {
+  background: var(--panel);
+  border: 1px solid #3a3c55;
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+button {
+  background: var(--accent);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  width: fit-content;
+  margin-top: 8px;
+}
+button:hover { opacity: 0.9; }
+
+table { border-collapse: collapse; margin-top: 12px; width: 100%; max-width: 500px; }
+th, td { border: 1px solid #3a3c55; padding: 6px 10px; text-align: left; font-size: 13px; }
+th { background: var(--panel); }
+
+code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
