@@ -15,6 +15,7 @@ pub fn run() {
             commands::import_dataset,
             commands::get_dataset_info,
             commands::train_model,
+            commands::evaluate_model,
             commands::run_inference,
             commands::continue_training,
             commands::full_test_inference,

@@ -66,18 +66,24 @@ function renderImportDataset() {
   contentEl.innerHTML = `
     <h2>Importer un dataset</h2>
     <p>Choisis le dossier racine contenant un sous-dossier par genre de moto
-    (ex: <code>dataset/sportive/</code>, <code>dataset/trail/</code>, ...).</p>
+    (ex: <code>dataset/sportive/</code>, <code>dataset/trail/</code>, ...).
+    Un split train/validation/test (70/15/15, stratifié par classe) est
+    calculé automatiquement à l'import.</p>
     <button id="pick-dir">Choisir un dossier</button>
     <div id="import-result"></div>
   `;
   document.getElementById("pick-dir").onclick = async () => {
     const dir = await open({ directory: true, multiple: false });
     if (!dir) return;
-    setStatus("Import et extraction des features en cours...");
+    setStatus("Import, split et extraction des features en cours (peut prendre un moment)...");
     try {
       const info = await invoke("import_dataset", { dirPath: dir });
-      setStatus(`Dataset importé : ${info.n_samples} images.`);
-      document.getElementById("import-result").innerHTML = renderDatasetInfo(info);
+      setStatus(`Dataset importé : ${info.train.n_samples} train / ${info.val.n_samples} val / ${info.test.n_samples} test.`);
+      document.getElementById("import-result").innerHTML = `
+        <h3>Train</h3>${renderDatasetInfo(info.train)}
+        <h3>Validation</h3>${renderDatasetInfo(info.val)}
+        <h3>Test</h3>${renderDatasetInfo(info.test)}
+      `;
     } catch (e) {
       setStatus(`Erreur : ${e}`, true);
     }

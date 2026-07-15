@@ -1,5 +1,5 @@
 use crate::data::features::extract_features;
-use crate::data::loader::load_dataset;
+use crate::data::loader::{load_dataset, split_train_val_test};
 use crate::models;
 use crate::models::any_model::{AnyModel, ModelKind, TrainParams};
 use crate::state::AppState;
@@ -7,9 +7,9 @@ use nalgebra::DMatrix;
 use serde::Serialize;
 use tauri::State;
 
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 // 0. Importer un dataset
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 
 #[derive(Serialize)]
 pub struct DatasetInfo {
@@ -18,21 +18,42 @@ pub struct DatasetInfo {
     pub counts: Vec<usize>, // nombre d'images par classe, même ordre que `classes`
 }
 
+#[derive(Serialize)]
+pub struct SplitDatasetInfo {
+    pub train: DatasetInfo,
+    pub val: DatasetInfo,
+    pub test: DatasetInfo,
+}
+
+/// Charge le dossier de dataset puis découpe automatiquement en train/val/test
+/// (70/15/15, stratifié par classe, seed fixe pour la reproductibilité — voir
+/// `split_train_val_test` dans data/loader.rs). `train` est utilisé par
+/// `train_model`, `test` par `evaluate_model` ; `val` n'est pas encore
+/// exploitée ailleurs dans l'app (piste : early-stopping / tuning).
 #[tauri::command]
-pub fn import_dataset(state: State<AppState>, dir_path: String) -> Result<DatasetInfo, String> {
+pub fn import_dataset(state: State<AppState>, dir_path: String) -> Result<SplitDatasetInfo, String> {
     let dataset = load_dataset(&dir_path).map_err(|e| e.to_string())?;
-    let info = dataset_info(&dataset);
+    let (train, val, test) = split_train_val_test(dataset, 0.7, 0.15, 42);
+
+    let info = SplitDatasetInfo {
+        train: dataset_info(&train),
+        val: dataset_info(&val),
+        test: dataset_info(&test),
+    };
 
     let mut inner = state.inner.lock().unwrap();
-    inner.dataset = Some(dataset);
+    inner.dataset = Some(train);
+    inner.test_dataset = Some(test);
 
     Ok(info)
 }
 
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 // 1. Afficher le dataset
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 
+/// Affiche les infos de la portion "train" du dataset (celle utilisée pour
+/// l'entraînement) voir `import_dataset` pour le détail complet train/val/test.
 #[tauri::command]
 pub fn get_dataset_info(state: State<AppState>) -> Result<DatasetInfo, String> {
     let inner = state.inner.lock().unwrap();
@@ -52,10 +73,10 @@ fn dataset_info(dataset: &crate::data::Dataset) -> DatasetInfo {
     }
 }
 
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 // 2-6. Entraîner / utiliser / modifier un modèle
 //      (Régression Linéaire, Classification Linéaire, MLP, SVM, RBF)
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 
 #[derive(Serialize)]
 pub struct TrainResult {
@@ -94,6 +115,52 @@ pub fn train_model(
 
     inner.models.insert(model_kind, model);
     Ok(result)
+}
+
+#[derive(Serialize)]
+pub struct EvalResult {
+    pub model_kind: String,
+    pub test_accuracy: f64,
+    pub n_test_samples: usize,
+    /// confusion_matrix[i][j] = nombre d'exemples de vraie classe `i` prédits comme classe `j`
+    pub confusion_matrix: Vec<Vec<usize>>,
+    pub class_names: Vec<String>,
+}
+
+/// Évalue un modèle déjà entraîné sur le jeu de TEST (jamais vu pendant l'entraînement).
+/// Nécessite d'avoir importé le dataset via `import_dataset_with_split` (l'import
+/// "simple" ne fournit pas de test_dataset séparé). C'est la seule commande qui
+/// donne une mesure de performance non biaisée — `train_accuracy` (renvoyée par
+/// `train_model`) ne dit rien sur la capacité de généralisation du modèle, elle
+/// peut être artificiellement élevée en cas de surapprentissage.
+#[tauri::command]
+pub fn evaluate_model(state: State<AppState>, model_kind: ModelKind) -> Result<EvalResult, String> {
+    let inner = state.inner.lock().unwrap();
+    let test_dataset = inner
+        .test_dataset
+        .as_ref()
+        .ok_or("Aucun jeu de test disponible — importe le dataset avec un fichier de split (import_dataset_with_split)")?;
+    let model = inner.models.get(&model_kind).ok_or("Ce modèle n'a pas encore été entraîné")?;
+
+    let (x, y) = dataset_to_arrays(test_dataset);
+    let preds = model.predict(&x);
+
+    let n_classes = test_dataset.classes.len();
+    let mut confusion_matrix = vec![vec![0usize; n_classes]; n_classes];
+    for (pred, truth) in preds.iter().zip(y.iter()) {
+        confusion_matrix[*truth][*pred] += 1;
+    }
+
+    let correct = preds.iter().zip(y.iter()).filter(|(p, t)| p == t).count();
+    let test_accuracy = correct as f64 / y.len() as f64;
+
+    Ok(EvalResult {
+        model_kind: model_kind.as_str().to_string(),
+        test_accuracy,
+        n_test_samples: y.len(),
+        confusion_matrix,
+        class_names: test_dataset.classes.clone(),
+    })
 }
 
 fn dataset_to_arrays(dataset: &crate::data::Dataset) -> (DMatrix<f64>, Vec<usize>) {
@@ -179,9 +246,9 @@ pub fn continue_training(
     })
 }
 
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 // 7. Full test d'une inférence (comparer tous les modèles entraînés)
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 
 #[tauri::command]
 pub fn full_test_inference(state: State<AppState>, image_path: String) -> Result<Vec<(String, PredictionResult)>, String> {
@@ -214,9 +281,9 @@ pub fn full_test_inference(state: State<AppState>, image_path: String) -> Result
     Ok(results)
 }
 
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 // 8. Exporter un modèle entraîné
-// ─────────────────────────────────────────────────────────────
+// ==============================================
 
 #[tauri::command]
 pub fn export_model(state: State<AppState>, model_kind: ModelKind, output_path: String) -> Result<(), String> {

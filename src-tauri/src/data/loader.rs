@@ -1,5 +1,8 @@
 use super::{features::extract_features, Dataset, Sample};
 use anyhow::Result;
+use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use std::fs::File;
 use std::io::Write;
 use walkdir::WalkDir;
@@ -39,6 +42,40 @@ pub fn load_dataset(input_dir: &str) -> Result<Dataset> {
     Ok(Dataset { samples, classes })
 }
 
+pub fn split_train_val_test(dataset: Dataset, train_ratio: f64, val_ratio: f64, seed: u64) -> (Dataset, Dataset, Dataset) {
+    let mut rng = StdRng::seed_from_u64(seed);
+    let n_classes = dataset.classes.len();
+
+    // Regroupe les indices des échantillons par classe
+    let mut by_class: Vec<Vec<usize>> = vec![Vec::new(); n_classes];
+    for (i, s) in dataset.samples.iter().enumerate() {
+        by_class[s.label].push(i);
+    }
+
+    let mut train_idx = Vec::new();
+    let mut val_idx = Vec::new();
+    let mut test_idx = Vec::new();
+
+    for indices in by_class.iter_mut() {
+        indices.shuffle(&mut rng);
+        let n = indices.len();
+        let n_train = (n as f64 * train_ratio).round() as usize;
+        let n_val = (n as f64 * val_ratio).round() as usize;
+        let val_end = (n_train + n_val).min(n);
+
+        train_idx.extend_from_slice(&indices[..n_train.min(n)]);
+        val_idx.extend_from_slice(&indices[n_train.min(n)..val_end]);
+        test_idx.extend_from_slice(&indices[val_end..]);
+    }
+
+    let build = |idx: Vec<usize>| Dataset {
+        samples: idx.into_iter().map(|i| dataset.samples[i].clone()).collect(),
+        classes: dataset.classes.clone(),
+    };
+
+    (build(train_idx), build(val_idx), build(test_idx))
+}
+
 /// Extrait le dataset et le sauvegarde en CSV : dernière colonne = label,
 /// première ligne = header avec les noms de classes en commentaire.
 pub fn extract_and_save(input_dir: &str, output: &str) -> Result<()> {
@@ -59,6 +96,3 @@ pub fn extract_and_save(input_dir: &str, output: &str) -> Result<()> {
     );
     Ok(())
 }
-
-// TODO : ajouter une fonction split_train_val_test(dataset, 0.7, 0.15, 0.15)
-// qui mélange (shuffle) puis découpe le Vec<Sample>.
