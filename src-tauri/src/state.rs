@@ -1,4 +1,4 @@
-use crate::data::Dataset;
+use crate::data::{Dataset, FeatureScaler};
 use crate::models::any_model::{AnyModel, ModelKind};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -12,14 +12,18 @@ pub struct AppState {
 
 #[derive(Default)]
 pub struct AppStateInner {
-    /// Dataset utilisé pour l'entraînement. Si un split train/val/test a été
-    /// fourni à l'import, c'est la portion "train" qui est stockée ici — c'est
-    /// elle qu'on veut voir passer dans `fit()`, jamais les données de test.
+    /// Dataset utilisé pour l'entraînement (portion "train" du split),
+    /// DÉJÀ standardisé (voir `scaler`) — jamais les features brutes.
     pub dataset: Option<Dataset>,
     /// Portion "test" du split, mise de côté pour évaluer un modèle déjà
-    /// entraîné sans jamais l'avoir vue pendant l'apprentissage. Absente si le
-    /// dataset a été importé sans fichier de split (import "simple").
+    /// entraîné sans jamais l'avoir vue pendant l'apprentissage. Également
+    /// déjà standardisée avec les mêmes stats que `dataset`.
     pub test_dataset: Option<Dataset>,
+    /// Stats de standardisation (moyenne/écart-type par feature), calculées
+    /// une seule fois sur le train à l'import. Réutilisées pour normaliser
+    /// toute image soumise en inférence (`run_inference`, `full_test_inference`)
+    /// — indispensable pour rester cohérent avec les échelles vues à l'entraînement.
+    pub scaler: Option<FeatureScaler>,
     pub models: HashMap<ModelKind, AnyModel>,
 }
 

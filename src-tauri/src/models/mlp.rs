@@ -15,7 +15,6 @@ impl Layer {
         let data: Vec<f64> = (0..n_in * n_out).map(|_| rng.gen_range(-scale..scale)).collect();
         // from_row_slice attend les données "ligne par ligne" (comme on les a générées),
         // et se charge de la conversion vers le stockage interne column-major de nalgebra.
-        // c'est pas claire mais pour moi ça l'est et je suis solo sur le projet
         Self { w: DMatrix::from_row_slice(n_in, n_out, &data), b: vec![0.0; n_out] }
     }
 }
@@ -38,11 +37,19 @@ pub struct Mlp {
 }
 
 impl Mlp {
+    /// Construction "normale" : initialisation aléatoire non reproductible
+    /// (`rand::thread_rng()`), adaptée à un vrai entraînement dans l'app —
+    /// on ne veut pas forcément retomber sur les mêmes poids de départ à
+    /// chaque lancement.
     pub fn new(n_features: usize, hidden_sizes: &[usize], n_classes: usize, lr: f64, epochs: usize, batch_size: usize) -> Self {
         let mut rng = rand::thread_rng();
         Self::new_with_rng(n_features, hidden_sizes, n_classes, lr, epochs, batch_size, &mut rng)
     }
 
+    /// Construction avec une seed fixe : les poids initiaux sont toujours les
+    /// mêmes pour une seed donnée. À utiliser dans les tests pour des résultats
+    /// reproductibles (sans ça, deux `cargo test` peuvent donner des résultats
+    /// différents sur XOR/Cross selon l'initialisation aléatoire tirée).
     pub fn new_seeded(n_features: usize, hidden_sizes: &[usize], n_classes: usize, lr: f64, epochs: usize, batch_size: usize, seed: u64) -> Self {
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         Self::new_with_rng(n_features, hidden_sizes, n_classes, lr, epochs, batch_size, &mut rng)

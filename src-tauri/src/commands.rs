@@ -1,5 +1,6 @@
 use crate::data::features::extract_features;
 use crate::data::loader::{load_dataset, split_train_val_test};
+use crate::data::FeatureScaler;
 use crate::models;
 use crate::models::any_model::{AnyModel, ModelKind, TrainParams};
 use crate::state::AppState;
@@ -7,9 +8,9 @@ use nalgebra::DMatrix;
 use serde::Serialize;
 use tauri::State;
 
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 // 0. Importer un dataset
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
 pub struct DatasetInfo {
@@ -27,13 +28,20 @@ pub struct SplitDatasetInfo {
 
 /// Charge le dossier de dataset puis découpe automatiquement en train/val/test
 /// (70/15/15, stratifié par classe, seed fixe pour la reproductibilité — voir
-/// `split_train_val_test` dans data/loader.rs). `train` est utilisé par
-/// `train_model`, `test` par `evaluate_model` ; `val` n'est pas encore
-/// exploitée ailleurs dans l'app (piste : early-stopping / tuning).
+/// `split_train_val_test` dans data/loader.rs), PUIS standardise les features
+/// (z-score, stats calculées sur le train uniquement — voir `FeatureScaler`
+/// dans data/mod.rs). `train` est utilisé par `train_model`, `test` par
+/// `evaluate_model` ; `val` n'est pas encore exploitée ailleurs dans l'app
+/// (piste : early-stopping / tuning).
 #[tauri::command]
 pub fn import_dataset(state: State<AppState>, dir_path: String) -> Result<SplitDatasetInfo, String> {
     let dataset = load_dataset(&dir_path).map_err(|e| e.to_string())?;
     let (train, val, test) = split_train_val_test(dataset, 0.7, 0.15, 42);
+
+    let scaler = FeatureScaler::fit(&train);
+    let train = scaler.transform_dataset(&train);
+    let val = scaler.transform_dataset(&val);
+    let test = scaler.transform_dataset(&test);
 
     let info = SplitDatasetInfo {
         train: dataset_info(&train),
@@ -44,16 +52,17 @@ pub fn import_dataset(state: State<AppState>, dir_path: String) -> Result<SplitD
     let mut inner = state.inner.lock().unwrap();
     inner.dataset = Some(train);
     inner.test_dataset = Some(test);
+    inner.scaler = Some(scaler);
 
     Ok(info)
 }
 
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 // 1. Afficher le dataset
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 
 /// Affiche les infos de la portion "train" du dataset (celle utilisée pour
-/// l'entraînement) voir `import_dataset` pour le détail complet train/val/test.
+/// l'entraînement) — voir `import_dataset` pour le détail complet train/val/test.
 #[tauri::command]
 pub fn get_dataset_info(state: State<AppState>) -> Result<DatasetInfo, String> {
     let inner = state.inner.lock().unwrap();
@@ -73,10 +82,10 @@ fn dataset_info(dataset: &crate::data::Dataset) -> DatasetInfo {
     }
 }
 
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 // 2-6. Entraîner / utiliser / modifier un modèle
 //      (Régression Linéaire, Classification Linéaire, MLP, SVM, RBF)
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
 pub struct TrainResult {
@@ -127,9 +136,8 @@ pub struct EvalResult {
     pub class_names: Vec<String>,
 }
 
-/// Évalue un modèle déjà entraîné sur le jeu de TEST (jamais vu pendant l'entraînement).
-/// Nécessite d'avoir importé le dataset via `import_dataset_with_split` (l'import
-/// "simple" ne fournit pas de test_dataset séparé). C'est la seule commande qui
+/// Évalue un modèle déjà entraîné sur le jeu de TEST (jamais vu pendant l'entraînement,
+/// standardisé avec les mêmes stats que le train). C'est la seule commande qui
 /// donne une mesure de performance non biaisée — `train_accuracy` (renvoyée par
 /// `train_model`) ne dit rien sur la capacité de généralisation du modèle, elle
 /// peut être artificiellement élevée en cas de surapprentissage.
@@ -189,7 +197,14 @@ pub fn run_inference(
     let dataset = inner.dataset.as_ref().ok_or("Aucun dataset importé (besoin des noms de classes)")?;
     let model = inner.models.get(&model_kind).ok_or("Ce modèle n'a pas encore été entraîné")?;
 
-    let features = extract_features(&image_path).map_err(|e| e.to_string())?;
+    let raw_features = extract_features(&image_path).map_err(|e| e.to_string())?;
+    // Standardisation avec les MÊMES stats (mean/std) que celles calculées sur
+    // le train à l'import — indispensable, sinon les features de cette image
+    // seraient sur une échelle incohérente avec ce que le modèle a appris.
+    let features = match &inner.scaler {
+        Some(scaler) => scaler.transform(&raw_features),
+        None => raw_features,
+    };
     let x = DMatrix::from_row_slice(1, features.len(), &features);
 
     let proba = model.predict_proba(&x);
@@ -233,6 +248,7 @@ pub fn continue_training(
         AnyModel::LogisticRegression(m) | AnyModel::LinearRegression(m) => m.epochs = extra_epochs,
         AnyModel::Mlp(m) => { /* TODO: exposer un setter epochs sur Mlp */ let _ = m; }
         AnyModel::Rbf(m) => { /* idem */ let _ = m; }
+        AnyModel::Svm(m) => { /* idem : SvmMulticlass n'expose pas encore de setter epochs */ let _ = m; }
     }
     model.fit(&x, &y, n_classes);
 
@@ -246,15 +262,19 @@ pub fn continue_training(
     })
 }
 
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 // 7. Full test d'une inférence (comparer tous les modèles entraînés)
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn full_test_inference(state: State<AppState>, image_path: String) -> Result<Vec<(String, PredictionResult)>, String> {
     let inner = state.inner.lock().unwrap();
     let dataset = inner.dataset.as_ref().ok_or("Aucun dataset importé")?;
-    let features = extract_features(&image_path).map_err(|e| e.to_string())?;
+    let raw_features = extract_features(&image_path).map_err(|e| e.to_string())?;
+    let features = match &inner.scaler {
+        Some(scaler) => scaler.transform(&raw_features),
+        None => raw_features,
+    };
     let x = DMatrix::from_row_slice(1, features.len(), &features);
 
     let mut results = Vec::new();
@@ -281,9 +301,9 @@ pub fn full_test_inference(state: State<AppState>, image_path: String) -> Result
     Ok(results)
 }
 
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 // 8. Exporter un modèle entraîné
-// ==============================================
+// ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn export_model(state: State<AppState>, model_kind: ModelKind, output_path: String) -> Result<(), String> {

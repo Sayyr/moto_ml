@@ -1,8 +1,9 @@
 use super::linear::LogisticRegression;
 use super::mlp::Mlp;
 use super::rbf::RbfNetwork;
+use super::svm::SvmMulticlass;
 use super::traits::Classifier;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use nalgebra::DMatrix;
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +13,7 @@ pub enum AnyModel {
     LogisticRegression(LogisticRegression),
     Mlp(Mlp),
     Rbf(RbfNetwork),
-    // Svm(SvmMulticlass), // TODO : à activer une fois svm.rs implémenté
+    Svm(SvmMulticlass),
 }
 
 /// Identifiant textuel utilisé côté frontend / commandes (correspond aux entrées du menu)
@@ -44,6 +45,7 @@ impl AnyModel {
             AnyModel::LogisticRegression(m) => m.fit(x, y, n_classes),
             AnyModel::Mlp(m) => m.fit(x, y, n_classes),
             AnyModel::Rbf(m) => m.fit(x, y, n_classes),
+            AnyModel::Svm(m) => m.fit(x, y, n_classes),
         }
     }
 
@@ -53,6 +55,7 @@ impl AnyModel {
             AnyModel::LogisticRegression(m) => m.predict_proba(x),
             AnyModel::Mlp(m) => m.predict_proba(x),
             AnyModel::Rbf(m) => m.predict_proba(x),
+            AnyModel::Svm(m) => m.predict_proba(x),
         }
     }
 
@@ -62,6 +65,7 @@ impl AnyModel {
             AnyModel::LogisticRegression(m) => m.predict(x),
             AnyModel::Mlp(m) => m.predict(x),
             AnyModel::Rbf(m) => m.predict(x),
+            AnyModel::Svm(m) => m.predict(x),
         }
     }
 
@@ -71,6 +75,7 @@ impl AnyModel {
             AnyModel::LogisticRegression(_) => ModelKind::LogisticRegression,
             AnyModel::Mlp(_) => ModelKind::Mlp,
             AnyModel::Rbf(_) => ModelKind::Rbf,
+            AnyModel::Svm(_) => ModelKind::Svm,
         }
     }
 
@@ -100,7 +105,13 @@ impl AnyModel {
                 params.lr,
                 params.epochs,
             )),
-            ModelKind::Svm => bail!("SVM pas encore implémenté (voir TODO models/svm.rs)"),
+            ModelKind::Svm => AnyModel::Svm(SvmMulticlass::new(
+                n_features,
+                n_classes,
+                params.lr,
+                params.lambda,
+                params.epochs,
+            )),
         })
     }
 }
@@ -115,6 +126,7 @@ pub struct TrainParams {
     pub hidden_layers: Vec<usize>,
     pub n_centers: usize,
     pub sigma: f64,
+    pub lambda: f64, // force de régularisation du SVM (ignoré par les autres modèles)
 }
 
 impl Default for TrainParams {
@@ -126,6 +138,7 @@ impl Default for TrainParams {
             hidden_layers: vec![64, 32],
             n_centers: 20,
             sigma: 1.0,
+            lambda: 0.01,
         }
     }
 }

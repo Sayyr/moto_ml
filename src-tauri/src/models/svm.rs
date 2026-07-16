@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// SVM linéaire binaire, optimisé par sous-gradient descent sur la hinge loss.
 ///
-/// Rappel théorique (à remettre dans le rapport sous latex) :
+/// Rappel théorique (à remettre dans ton rapport) :
 ///   - Labels en {-1, +1} (pas 0/1).
 ///   - Score : f(x) = w·x + b
 ///   - Hinge loss pour un exemple : max(0, 1 - y_i * f(x_i))

@@ -119,6 +119,7 @@ function renderModelView(kind, label) {
       <button class="tab active" data-tab="train">Entraîner</button>
       <button class="tab" data-tab="use">Utiliser</button>
       <button class="tab" data-tab="edit">Modifier</button>
+      <button class="tab" data-tab="evaluate">Évaluer</button>
     </div>
     <div id="tab-content"></div>
   `;
@@ -131,6 +132,7 @@ function renderModelView(kind, label) {
       if (tab.dataset.tab === "train") renderTrainTab(tabContent, kind);
       if (tab.dataset.tab === "use") renderUseTab(tabContent, kind);
       if (tab.dataset.tab === "edit") renderEditTab(tabContent, kind);
+      if (tab.dataset.tab === "evaluate") renderEvaluateTab(tabContent, kind);
     };
   });
 
@@ -140,6 +142,7 @@ function renderModelView(kind, label) {
 function renderTrainTab(container, kind) {
   const showMlpParams = kind === "Mlp";
   const showRbfParams = kind === "Rbf";
+  const showSvmParams = kind === "Svm";
 
   container.innerHTML = `
     <div class="form">
@@ -152,6 +155,9 @@ function renderTrainTab(container, kind) {
       ${showRbfParams ? `
         <label>Nombre de centres <input id="p-centers" type="number" value="20"></label>
         <label>Sigma <input id="p-sigma" type="number" step="0.1" value="1.0"></label>
+      ` : ""}
+      ${showSvmParams ? `
+        <label>Lambda (régularisation) <input id="p-lambda" type="number" step="0.001" value="0.01"></label>
       ` : ""}
       <button id="train-btn">Lancer l'entraînement</button>
     </div>
@@ -168,6 +174,7 @@ function renderTrainTab(container, kind) {
         : [64, 32],
       n_centers: showRbfParams ? parseInt(document.getElementById("p-centers").value) : 20,
       sigma: showRbfParams ? parseFloat(document.getElementById("p-sigma").value) : 1.0,
+      lambda: showSvmParams ? parseFloat(document.getElementById("p-lambda").value) : 0.01,
     };
 
     setStatus("Entraînement en cours...");
@@ -234,6 +241,39 @@ function renderEditTab(container, kind) {
       setStatus(`Erreur : ${e}`, true);
     }
   };
+}
+
+function renderEvaluateTab(container, kind) {
+  container.innerHTML = `
+    <p>Évalue le modèle "${kind}" (déjà entraîné) sur le jeu de <strong>test</strong> —
+    des images jamais vues pendant l'entraînement, mises de côté automatiquement
+    à l'import du dataset (menu 0).</p>
+    <button id="eval-btn">Évaluer sur le test set</button>
+    <div id="eval-result"></div>
+  `;
+  document.getElementById("eval-btn").onclick = async () => {
+    setStatus("Évaluation en cours...");
+    try {
+      const result = await invoke("evaluate_model", { modelKind: kind });
+      setStatus(`Évaluation terminée : ${(result.test_accuracy * 100).toFixed(1)}% sur ${result.n_test_samples} images de test.`);
+      document.getElementById("eval-result").innerHTML = renderEvalResult(result);
+    } catch (e) {
+      setStatus(`Erreur : ${e}`, true);
+    }
+  };
+}
+
+function renderEvalResult(result) {
+  const header = `<th></th>` + result.class_names.map((c) => `<th>préd. ${c}</th>`).join("");
+  const rows = result.confusion_matrix
+    .map((row, i) => `<tr><td><strong>vrai ${result.class_names[i]}</strong></td>${row.map((v) => `<td>${v}</td>`).join("")}</tr>`)
+    .join("");
+
+  return `
+    <p>Accuracy (test, ${result.n_test_samples} images) : <strong>${(result.test_accuracy * 100).toFixed(1)}%</strong></p>
+    <h3>Matrice de confusion</h3>
+    <table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>
+  `;
 }
 
 // ── 7. Full test d'une inférence ────────────────────────────────

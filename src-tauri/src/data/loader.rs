@@ -8,12 +8,13 @@ use std::io::Write;
 use walkdir::WalkDir;
 
 /// Parcourt `input_dir/<classe>/*.jpg` et construit le Dataset.
-/// Structure attendue :
+/// Structure attendue (peu importe la profondeur sous chaque classe, WalkDir
+/// est récursif — donc `cruiser/harley-davidson/fat_boy/xxx.jpg` fonctionne
+/// aussi bien que `cruiser/xxx.jpg`) :
 ///   dataset/
-///     sportive/xxx.jpg
-///     roadster/yyy.jpg
-///     trail/zzz.jpg
-///     ...
+///     cruiser/...
+///     sport/...
+///     trail/...
 pub fn load_dataset(input_dir: &str) -> Result<Dataset> {
     let mut classes: Vec<String> = std::fs::read_dir(input_dir)?
         .filter_map(|e| e.ok())
@@ -42,6 +43,15 @@ pub fn load_dataset(input_dir: &str) -> Result<Dataset> {
     Ok(Dataset { samples, classes })
 }
 
+/// Découpe un dataset déjà chargé en train/val/test, de façon STRATIFIÉE :
+/// le split est fait indépendamment à l'intérieur de chaque classe, puis
+/// recombiné, ce qui garantit que les proportions train/val/test sont
+/// respectées classe par classe (et pas juste globalement — important si une
+/// classe est plus petite que les autres, pour éviter de la sous-représenter
+/// dans le test set par pur hasard).
+///
+/// `seed` fixe rend le split reproductible : deux imports successifs du même
+/// dataset avec la même seed donnent exactement le même découpage.
 pub fn split_train_val_test(dataset: Dataset, train_ratio: f64, val_ratio: f64, seed: u64) -> (Dataset, Dataset, Dataset) {
     let mut rng = StdRng::seed_from_u64(seed);
     let n_classes = dataset.classes.len();

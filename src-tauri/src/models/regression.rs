@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 ///   grad_b = (2/n) * Σ(ŷ - y)
 #[derive(Serialize, Deserialize)]
 pub struct LinearRegression {
-    pub weights: Vec<f64>, // (n_features,) - une seule sortie continue
+    pub weights: Vec<f64>, // (n_features,) — une seule sortie continue
     pub bias: f64,
     pub lr: f64,
     pub epochs: usize,

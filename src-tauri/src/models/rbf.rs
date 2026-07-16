@@ -26,9 +26,13 @@ impl RbfNetwork {
         }
     }
 
-    /// Distance euclidienne au carré entre deux lignes (vues) de matrices
+    /// Distance euclidienne au carré entre deux lignes (vues) de matrices.
+    /// Générique sur l'itérateur plutôt que de nommer le type exact d'une vue
+    /// de ligne nalgebra (qui n'existait pas sous le nom que j'avais utilisé,
+    /// et dont le nom exact peut de toute façon varier selon la version) —
+    /// on demande juste "quelque chose qu'on peut itérer en &f64".
     fn squared_dist<'a>(a: impl Iterator<Item = &'a f64>, b: impl Iterator<Item = &'a f64>) -> f64 {
-    a.zip(b).map(|(x, y)| (x - y).powi(2)).sum()
+        a.zip(b).map(|(x, y)| (x - y).powi(2)).sum()
     }
 
     /// K-means simplifié (initialisation aléatoire + itérations de Lloyd)
@@ -129,8 +133,6 @@ impl Classifier for RbfNetwork {
     }
 }
 
-// NOTE nalgebra : `RowDVectorView<f64>` est le type d'une "vue" sur une ligne
-// (pas de copie mémoire). `.set_row(i, &row_vector)` attend un vrai RowDVector
-// (ou une vue compatible) — vérifie ce nom exact dans la doc nalgebra de ta
-// version (`cargo doc --open -p nalgebra`) si ça ne compile pas du premier coup,
-// l'API des vues a un peu bougé selon les versions 0.3x.
+// NOTE nalgebra : `.set_row(i, &row_vector)` attend un `RowDVector` (ou une vue
+// compatible) — si CETTE ligne pose problème à son tour, la doc à consulter est
+// la même : `cargo doc --open -p nalgebra`, section `Matrix::set_row`.
