@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 // Correspond exactement au menu ASCII fourni : index -> action
 const MENU_ITEMS = [
@@ -11,9 +11,8 @@ const MENU_ITEMS = [
   { id: 5, label: "SVM", view: "model", kind: "Svm" },
   { id: 6, label: "RBF", view: "model", kind: "Rbf" },
   { id: 7, label: "Full test d'une inférence", view: "full-test" },
-  { id: 8, label: "Exporter un modèle entraîné", view: "export" },
-  { id: 9, label: "Importer un modèle entraîné", view: "import" },
-  { id: 10, label: "Quitter", view: "quit" },
+  { id: 8, label: "Import/Export", view: "export" },
+  { id: 9, label: "Quitter", view: "quit" },
 ];
 
 const menuEl = document.getElementById("menu");
@@ -55,9 +54,6 @@ function selectMenuItem(item) {
       break;
     case "export":
       renderExport();
-      break;
-    case "import":
-      renderImport();
       break;
     case "quit":
       window.close();
