@@ -327,31 +327,3 @@ pub fn list_trained_models(state: State<AppState>) -> Vec<String> {
     let inner = state.inner.lock().unwrap();
     inner.models.keys().map(|k| k.as_str().to_string()).collect()
 }
-
-
-// ─────────────────────────────────────────────────────────────
-// 9. Importer un modèle entraîné
-// ─────────────────────────────────────────────────────────────
-
-#[tauri::command]
-pub fn export_model(state: State<AppState>, model_kind: ModelKind, output_path: String) -> Result<(), String> {
-    let inner = state.inner.lock().unwrap();
-    let model = inner.models.get(&model_kind).ok_or("Ce modèle n'a pas encore été entraîné")?;
-    models::save_model(model, &output_path).map_err(|e| e.to_string())
-}
-
-/// Charge un modèle exporté précédemment (utile pour "Utiliser" un modèle
-/// sans avoir eu à le réentraîner dans la session courante).
-#[tauri::command]
-pub fn import_model(state: State<AppState>, model_kind: ModelKind, input_path: String) -> Result<(), String> {
-    let model = models::load_model(&input_path).map_err(|e| e.to_string())?;
-    let mut inner = state.inner.lock().unwrap();
-    inner.models.insert(model_kind, model);
-    Ok(())
-}
-
-#[tauri::command]
-pub fn list_trained_models(state: State<AppState>) -> Vec<String> {
-    let inner = state.inner.lock().unwrap();
-    inner.models.keys().map(|k| k.as_str().to_string()).collect()
-}

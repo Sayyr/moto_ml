@@ -45,7 +45,7 @@ pub fn load_dataset(input_dir: &str) -> Result<Dataset> {
 
 
 pub fn split_train_val_test(dataset: Dataset, train_ratio: f64, val_ratio: f64, seed: u64) -> (Dataset, Dataset, Dataset) {
-    let mut rng = StdRng::seed_from_u64(7); //seed fix : 7
+    let mut rng = StdRng::seed_from_u64(seed);
     let n_classes = dataset.classes.len();
 
     // Regroupe les indices des échantillons par classe
