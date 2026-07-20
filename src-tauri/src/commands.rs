@@ -327,3 +327,4 @@ pub fn list_trained_models(state: State<AppState>) -> Vec<String> {
     let inner = state.inner.lock().unwrap();
     inner.models.keys().map(|k| k.as_str().to_string()).collect()
 }
+
