@@ -12,7 +12,8 @@ const MENU_ITEMS = [
   { id: 6, label: "RBF", view: "model", kind: "Rbf" },
   { id: 7, label: "Full test d'une inférence", view: "full-test" },
   { id: 8, label: "Exporter un modèle entraîné", view: "export" },
-  { id: 9, label: "Quitter", view: "quit" },
+  { id: 9, label: "Importer un modèle entraîné", view: "import" },
+  { id: 10, label: "Quitter", view: "quit" },
 ];
 
 const menuEl = document.getElementById("menu");
@@ -54,6 +55,9 @@ function selectMenuItem(item) {
       break;
     case "export":
       renderExport();
+      break;
+    case "import":
+      renderImport();
       break;
     case "quit":
       window.close();
@@ -317,6 +321,36 @@ function renderExport() {
   `;
   document.getElementById("export-btn").onclick = async () => {
     const kind = document.getElementById("export-kind").value;
+    const path = await open({ directory: false, multiple: false, save: true }).catch(() => null);
+    // NOTE : pour un vrai save dialog, utilise `save()` de @tauri-apps/plugin-dialog
+    // plutôt que `open()` — à corriger, `open` sert normalement à choisir un fichier existant.
+    if (!path) return;
+    try {
+      await invoke("export_model", { modelKind: kind, outputPath: path });
+      setStatus(`Modèle "${kind}" exporté vers ${path}`);
+    } catch (e) {
+      setStatus(`Erreur : ${e}`, true);
+    }
+  };
+}
+
+// ── 9. Importer un modèle entraîné ──────────────────────────────
+function renderImport() {
+  contentEl.innerHTML = `
+    <h2>Importer un modèle entraîné</h2>
+    <label>Modèle
+      <select id="import-kind">
+        <option value="LinearRegression">Régression Linéaire</option>
+        <option value="LogisticRegression">Classification Linéaire</option>
+        <option value="Mlp">MLP</option>
+        <option value="Svm">SVM</option>
+        <option value="Rbf">RBF</option>
+      </select>
+    </label>
+    <button id="import-btn">Choisir où Récupérer</button>
+  `;
+  document.getElementById("import-btn").onclick = async () => {
+    const kind = document.getElementById("import-kind").value;
     const path = await open({ directory: false, multiple: false, save: true }).catch(() => null);
     // NOTE : pour un vrai save dialog, utilise `save()` de @tauri-apps/plugin-dialog
     // plutôt que `open()` — à corriger, `open` sert normalement à choisir un fichier existant.

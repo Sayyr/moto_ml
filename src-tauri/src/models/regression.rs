@@ -67,7 +67,6 @@ impl LinearRegression {
     }
 }
 
-// TODO : MLP en mode régression — retirer le softmax de la dernière couche du
+// TODO : MLP en mode régression ; retirer le softmax de la dernière couche du
 // Mlp (mlp.rs), remplacer le delta initial de la backprop par 2*(ŷ - y)/n au
-// lieu de (probs - y_onehot). Duplique `Mlp` en `MlpRegressor` si tu préfères
-// garder le code de classification intact (recommandé pour commencer).
+// lieu de (probs - y_onehot). Duplique `Mlp` en `MlpRegressor` 

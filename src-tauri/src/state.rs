@@ -5,15 +5,15 @@ use std::sync::Mutex;
 
 /// État partagé de l'application, accessible depuis toutes les commandes Tauri
 /// via `tauri::State<AppState>`. Un modèle entraîné par catégorie (on peut
-/// avoir un MLP ET un RBF entraînés simultanément).
+/// avoir un MLP ET un RBF entraînés simultanément en théorie mais en pratique 
+/// mon pc est pas assez puissant pour ça mdr).
 pub struct AppState {
     pub inner: Mutex<AppStateInner>,
 }
 
 #[derive(Default)]
 pub struct AppStateInner {
-    /// Dataset utilisé pour l'entraînement (portion "train" du split),
-    /// DÉJÀ standardisé (voir `scaler`) — jamais les features brutes.
+    /// Dataset utilisé pour l'entraînement (portion "train" du split)
     pub dataset: Option<Dataset>,
     /// Portion "test" du split, mise de côté pour évaluer un modèle déjà
     /// entraîné sans jamais l'avoir vue pendant l'apprentissage. Également
@@ -21,8 +21,7 @@ pub struct AppStateInner {
     pub test_dataset: Option<Dataset>,
     /// Stats de standardisation (moyenne/écart-type par feature), calculées
     /// une seule fois sur le train à l'import. Réutilisées pour normaliser
-    /// toute image soumise en inférence (`run_inference`, `full_test_inference`)
-    /// — indispensable pour rester cohérent avec les échelles vues à l'entraînement.
+    /// toute image soumise en inférence (`run_inference`, `full_test_inference`) cohérence
     pub scaler: Option<FeatureScaler>,
     pub models: HashMap<ModelKind, AnyModel>,
 }

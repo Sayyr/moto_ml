@@ -28,7 +28,7 @@ impl SvmLinear {
         Self { weights: vec![0.0; n_features], bias: 0.0, lr, lambda, epochs }
     }
 
-    /// Entraîne le SVM binaire par descente de sous-gradient (style Pegasos).
+    /// Entraîne le SVM binaire par descente de sous-gradient
     /// `y` doit contenir des valeurs -1.0 ou 1.0.
     pub fn fit(&mut self, x: &DMatrix<f64>, y: &[f64]) {
         let n = x.nrows();
@@ -93,10 +93,7 @@ impl Classifier for SvmMulticlass {
         }
     }
 
-    /// Un SVM n'a pas de probabilités "natives" (contrairement à softmax) — on
-    /// applique quand même softmax aux scores bruts de chaque classifieur pour
-    /// rester cohérent avec l'interface `Classifier` du reste du projet. Ce n'est
-    /// pas une vraie probabilité calibrée, juste une normalisation pratique.
+    // normavilisation
     fn predict_proba(&self, x: &DMatrix<f64>) -> DMatrix<f64> {
         let mut scores = DMatrix::<f64>::zeros(x.nrows(), self.classifiers.len());
         for (c, clf) in self.classifiers.iter().enumerate() {

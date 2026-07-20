@@ -142,28 +142,3 @@ impl Default for TrainParams {
         }
     }
 }
-
-// TODO IMPORTANT : `AnyModel::LinearRegression` réutilise encore
-// LogisticRegression (softmax) alors que `regression::LinearRegression` est
-// maintenant implémenté (sortie continue, MSE). Je ne l'ai PAS branché ici
-// volontairement : `regression::LinearRegression::fit()` attend `y: &[f64]`
-// (des valeurs continues), alors que le trait `Classifier` partagé par tout
-// AnyModel attend `y: &[usize]` (des labels de classe). Les deux ne sont pas
-// compatibles tels quels.
-//
-// Concrètement, ça pose une vraie question de conception, pas juste un TODO
-// mécanique : dans CETTE application (classification de genre de moto), le
-// dataset n'a que des labels catégoriels (le genre), donc il n'y a pas de
-// cible continue naturelle à prédire — "Régression Linéaire" n'a de sens
-// que sur les cas de test du notebook (X/Y synthétiques, déjà couverts par
-// tests/test_cases.rs, qui utilisent regression::LinearRegression directement,
-// SANS passer par AnyModel).
-//
-// Si tu veux quand même l'exposer dans le menu de l'app (entrée 2, "Entraîner"),
-// deux options : (a) un second trait `Regressor` séparé de `Classifier`, avec
-// son propre stockage dans AppState (ex: `regression_model: Option<LinearRegression>`
-// à côté de `models: HashMap<ModelKind, AnyModel>`) ; (b) accepter que cette
-// entrée de menu reste "cas de test uniquement, pas d'entraînement GUI" et le
-// documenter comme limitation connue dans le rapport. L'option (b) est plus
-// rapide et défendable pour un projet étudiant — à toi de voir selon le temps
-// qu'il te reste.

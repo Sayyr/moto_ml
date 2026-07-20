@@ -49,7 +49,7 @@ fn color_histogram(img: &DynamicImage, bins: usize) -> Vec<f64> {
 
 /// HOG (Histogram of Oriented Gradients) — capture la forme/silhouette plutôt
 /// que la couleur, souvent plus discriminant pour distinguer des genres de moto
-/// que la seule couleur. Paramètres classiques (Dalal & Triggs, 2005) : cellules
+/// que la seule couleur paramètres classiques (Dalal & Triggs, 2005) : cellules
 /// de 8x8 px, blocs de 2x2 cellules avec chevauchement (stride = 1 cellule),
 /// 9 bins d'orientation sur 0-180° (gradient "non signé" : une direction et son
 /// opposée comptent pareil, ce qui rend HOG insensible à l'inversion noir/blanc
@@ -57,9 +57,12 @@ fn color_histogram(img: &DynamicImage, bins: usize) -> Vec<f64> {
 ///
 /// ATTENTION : avec IMG_SIZE=32 et des cellules de 8px, on n'a que 4x4 cellules —
 /// c'est un peu grossier pour capturer la silhouette d'une moto. Si les résultats
-/// sont décevants, essaie d'augmenter IMG_SIZE (64) plutôt que de réduire la
+/// sont décevants, tenter d'augmenter IMG_SIZE (64) plutôt que de réduire la
 /// taille des cellules (le ratio image/cellule compte plus que la résolution
 /// absolue).
+/// 
+/// pour l'instant, img32 apportent des résultats plus satisfaisant que 64, 
+/// donc on gaarde en 32 pour au moins la démo
 pub fn hog_features(img: &DynamicImage) -> Vec<f64> {
     let gray = img.to_luma8();
     let (width, height) = gray.dimensions();
@@ -123,9 +126,7 @@ fn compute_gradients(gray: &image::GrayImage) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) 
     let mut orientation = vec![vec![0.0; w]; h];
 
     // On reste à l'intérieur de l'image (1..w-1, 1..h-1) pour toujours avoir un
-    // voisin de chaque côté ; les pixels du bord restent à 0 (magnitude nulle),
-    // ce qui est une simplification standard (l'info utile est rarement sur le
-    // tout dernier pixel du bord).
+    // voisin de chaque côté ; les pixels du bord restent à 0 (magnitude nulle)
     for y in 1..h - 1 {
         for x in 1..w - 1 {
             let left = gray.get_pixel((x - 1) as u32, y as u32).0[0] as f64;
@@ -151,7 +152,7 @@ mod tests {
     use super::*;
     use image::{GrayImage, Luma};
 
-    /// Reprend exactement l'exemple calculé à la main : un contour vertical net
+    /// Reprend exactement l'exemple calculé à la main plus tôt : un contour vertical net
     /// (colonne de gauche à 50, colonne de droite à 200). Le pixel central doit
     /// avoir Gx=150, Gy=0, donc magnitude=150 et orientation=0°.
     #[test]

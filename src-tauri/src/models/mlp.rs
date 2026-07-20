@@ -141,5 +141,4 @@ impl Classifier for Mlp {
 
 // TODO : ajouter le shuffle des indices à chaque epoch (important pour la convergence).
 // NOTE nalgebra : `.rows(start, count)` retourne une VUE (pas de copie) ; `.into_owned()`
-// force la copie en DMatrix indépendante — nécessaire ici car x_batch doit vivre
-// au-delà de l'appel (utilisé dans forward_full ET backward).
+// force la copie en DMatrix indépendante ; x_batch doit vivre au delà de ça

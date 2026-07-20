@@ -134,5 +134,5 @@ impl Classifier for RbfNetwork {
 }
 
 // NOTE nalgebra : `.set_row(i, &row_vector)` attend un `RowDVector` (ou une vue
-// compatible) — si CETTE ligne pose problème à son tour, la doc à consulter est
+// compatible) ; si CETTE ligne pose problème à son tour, la doc à consulter est
 // la même : `cargo doc --open -p nalgebra`, section `Matrix::set_row`.

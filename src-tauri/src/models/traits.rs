@@ -37,8 +37,8 @@ pub fn one_hot(y: &[usize], n_classes: usize) -> DMatrix<f64> {
 }
 
 /// Softmax numériquement stable, ligne par ligne.
-/// nalgebra n'a pas de softmax intégré (ce n'est pas une lib de ML) : on boucle
-/// sur les lignes à la main.
+/// nalgebra n'a pas de softmax intégré 
+/// on boucle à la main
 pub fn softmax(logits: &DMatrix<f64>) -> DMatrix<f64> {
     let mut out = logits.clone();
     for mut row in out.row_iter_mut() {
@@ -54,9 +54,8 @@ pub fn softmax(logits: &DMatrix<f64>) -> DMatrix<f64> {
     out
 }
 
-/// nalgebra ne fait pas de broadcasting automatique (contrairement à numpy/ndarray) :
-/// additionner un vecteur ligne à chaque ligne d'une matrice doit être fait à la main.
-/// C'est l'équivalent de l'ajout du biais dans une couche dense.
+/// nalgebra ne fait pas de broadcasting automatique
+/// donc on.. on fait à la main aussi
 pub fn add_row_broadcast(m: &DMatrix<f64>, bias: &[f64]) -> DMatrix<f64> {
     let mut out = m.clone();
     for mut row in out.row_iter_mut() {
