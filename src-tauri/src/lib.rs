@@ -20,6 +20,7 @@ pub fn run() {
             commands::continue_training,
             commands::full_test_inference,
             commands::export_model,
+            commands::import_model,
             commands::list_trained_models,
         ])
         .run(tauri::generate_context!())
