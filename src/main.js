@@ -304,7 +304,7 @@ function renderFullTest() {
   };
 }
 
-// ── 8. Exporter un modèle entraîné ──────────────────────────────
+// ── 8. Exporter / Importer un modèle entraîné ───────────────────
 function renderExport() {
   contentEl.innerHTML = `
     <h2>Exporter un modèle entraîné</h2>
@@ -318,25 +318,7 @@ function renderExport() {
       </select>
     </label>
     <button id="export-btn">Choisir où enregistrer</button>
-  `;
-  document.getElementById("export-btn").onclick = async () => {
-    const kind = document.getElementById("export-kind").value;
-    const path = await open({ directory: false, multiple: false, save: true }).catch(() => null);
-    // NOTE : pour un vrai save dialog, utilise `save()` de @tauri-apps/plugin-dialog
-    // plutôt que `open()` — à corriger, `open` sert normalement à choisir un fichier existant.
-    if (!path) return;
-    try {
-      await invoke("export_model", { modelKind: kind, outputPath: path });
-      setStatus(`Modèle "${kind}" exporté vers ${path}`);
-    } catch (e) {
-      setStatus(`Erreur : ${e}`, true);
-    }
-  };
-}
 
-// ── 9. Importer un modèle entraîné ──────────────────────────────
-function renderImport() {
-  contentEl.innerHTML = `
     <h2>Importer un modèle entraîné</h2>
     <label>Modèle
       <select id="import-kind">
@@ -347,17 +329,35 @@ function renderImport() {
         <option value="Rbf">RBF</option>
       </select>
     </label>
-    <button id="import-btn">Choisir où Récupérer</button>
+    <button id="import-btn">Choisir le fichier à importer</button>
   `;
-  document.getElementById("import-btn").onclick = async () => {
-    const kind = document.getElementById("import-kind").value;
-    const path = await open({ directory: false, multiple: false, save: true }).catch(() => null);
-    // NOTE : pour un vrai save dialog, utilise `save()` de @tauri-apps/plugin-dialog
-    // plutôt que `open()` — à corriger, `open` sert normalement à choisir un fichier existant.
+
+  document.getElementById("export-btn").onclick = async () => {
+    const kind = document.getElementById("export-kind").value;
+    const path = await save({
+      filters: [{ name: "Modèle", extensions: ["bin"] }],
+      defaultPath: `${kind}.bin`,
+    }).catch(() => null);
     if (!path) return;
     try {
       await invoke("export_model", { modelKind: kind, outputPath: path });
       setStatus(`Modèle "${kind}" exporté vers ${path}`);
+    } catch (e) {
+      setStatus(`Erreur : ${e}`, true);
+    }
+  };
+
+  document.getElementById("import-btn").onclick = async () => {
+    const kind = document.getElementById("import-kind").value;
+    const path = await open({
+      directory: false,
+      multiple: false,
+      filters: [{ name: "Modèle", extensions: ["bin"] }],
+    }).catch(() => null);
+    if (!path) return;
+    try {
+      await invoke("import_model", { modelKind: kind, inputPath: path });
+      setStatus(`Modèle "${kind}" importé depuis ${path}`);
     } catch (e) {
       setStatus(`Erreur : ${e}`, true);
     }
